@@ -34,7 +34,7 @@ export const Currencies: Record<
       return player.points
     },
     set amount(v) {
-      player.points = v
+      player.points = Decimal.max(v, 1)
     },
 
     get gain() {
