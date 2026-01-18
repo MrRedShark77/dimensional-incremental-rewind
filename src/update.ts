@@ -29,7 +29,7 @@ export function loop() {
 
 export function calc(dt: number) {
   for (const i in Currencies) if (i !== 'fabrics') {
-    const C = Currencies[i as Currency]
+    const C = Currencies[i]
     C.amount = Decimal.mul(temp.currencies[i], C.passive).mul(dt).add(C.amount)
   }
 
@@ -168,7 +168,7 @@ export function updateTemp() {
 
   updateDimensionsTemp()
 
-  for (const i in Currencies) temp.currencies[i] = Currencies[i as Currency].gain
+  for (const i in Currencies) temp.currencies[i] = Currencies[i].gain
 
   updateTabNotifications()
 }

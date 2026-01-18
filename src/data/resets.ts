@@ -1,5 +1,5 @@
 import type { DecimalSource } from "break_eternity.js"
-import { Currencies, Currency } from "./currencies"
+import { Currencies } from "./currencies"
 import { Dimension, Dimensions, Strings } from "./dimensions"
 import Decimal from "break_eternity.js"
 import { player, temp } from "@/main"
@@ -8,8 +8,8 @@ import { NonRepeatableUpgradeGroups, resetUpgradesByGroup } from "./upgrades"
 import { checkMilestones, isMilestoneAchieved, resetMilestonesByGroup } from "./milestones"
 
 export const Resets: Record<string, {
-  currency: Currency
-  gain: Currency
+  currency: string
+  gain: string
 
   next: DecimalSource
 
@@ -17,8 +17,8 @@ export const Resets: Record<string, {
   reset(): void
 }> = {
   dots: {
-    currency: Currency.Points,
-    gain: Currency.Dots,
+    currency: "points",
+    gain: "dots",
 
     get next() { return Dimensions[Dimension.Dot].next(Decimal.add(Currencies[this.gain].amount, temp.currencies[this.gain])) },
 
@@ -29,8 +29,8 @@ export const Resets: Record<string, {
     },
   },
   lines: {
-    currency: Currency.Dots,
-    gain: Currency.Lines,
+    currency: "dots",
+    gain: "lines",
 
     get next() { return Dimensions[Dimension.Line].next(Decimal.add(Currencies[this.gain].amount, temp.currencies[this.gain])) },
 
@@ -45,8 +45,8 @@ export const Resets: Record<string, {
     },
   },
   strings: {
-    currency: Currency.LineSegments,
-    gain: Currency.Strings,
+    currency: "line-segments",
+    gain: "strings",
 
     get next() { return Strings.require(Decimal.add(Currencies[this.gain].amount, temp.currencies[this.gain])) },
 
@@ -61,8 +61,8 @@ export const Resets: Record<string, {
     },
   },
   shapes: {
-    currency: Currency.Lines,
-    gain: Currency.Shapes,
+    currency: "lines",
+    gain: "shapes",
 
     get next() { return Dimensions[Dimension.Shape].next(Decimal.add(Currencies[this.gain].amount, temp.currencies[this.gain])) },
 

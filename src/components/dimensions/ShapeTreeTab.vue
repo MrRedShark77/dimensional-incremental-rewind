@@ -3,7 +3,7 @@ import { player } from '@/main';
 import { format } from '@/utils/formats';
 import PrimaryButton from '../PrimaryButton.vue';
 import { FabricCostRequirements, getFabrics, respecShapeTree, ShapeTreeDepth } from '@/data/shape_tree';
-import { Currencies, Currency } from '@/data/currencies';
+import { Currencies } from '@/data/currencies';
 import Decimal from 'break_eternity.js';
 import ShapeTreeUpgrade from './ShapeTreeUpgrade.vue';
 </script>
@@ -19,9 +19,9 @@ import ShapeTreeUpgrade from './ShapeTreeUpgrade.vue';
     <div>You have {{ format(Currencies.fabrics.amount,0) }} Fabrics.</div>
     <div class="fabric-buttons">
       <PrimaryButton v-for="(v,i) in FabricCostRequirements" :key="i"
-      :enabled="Decimal.gte(Currencies[v.currency as Currency].amount, v.require(player.total_fabrics[i]))"
+      :enabled="Decimal.gte(Currencies[v.currency].amount, v.require(player.total_fabrics[i]))"
       @click="getFabrics(i)">
-        Require <b>{{ format(v.require(player.total_fabrics[i]),0) }}</b> {{ Currencies[v.currency as Currency].name }}
+        Require <b>{{ format(v.require(player.total_fabrics[i]),0) }}</b> {{ Currencies[v.currency].name }}
       </PrimaryButton>
     </div>
   </div>

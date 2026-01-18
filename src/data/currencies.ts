@@ -8,20 +8,20 @@ import { getUpgradeEffect } from './upgrades'
 import { DC, expPow } from '@/utils/decimal'
 import { hasShapeTree } from './shape_tree'
 
-export enum Currency {
-  Points = 'points',
-  Dots = 'dots',
-  Lines = 'lines',
-  Shapes = 'shapes',
+export const Currency = {
+  Points: 'points',
+  Dots: 'dots',
+  Lines: 'lines',
+  Shapes: 'shapes',
 
-  LineSegments = 'line-segments',
-  Strings = 'strings',
-  Fabrics = 'fabrics',
-  Polygons = 'polygons',
+  LineSegments: 'line-segments',
+  Strings: 'strings',
+  Fabrics: 'fabrics',
+  Polygons: 'polygons',
 }
 
 export const Currencies: Record<
-  Currency,
+  string,
   {
     name: string
     amount: DecimalSource
@@ -175,7 +175,7 @@ export const Currencies: Record<
   },
 }
 
-export function formatCurrencyGain(id: Currency) {
+export function formatCurrencyGain(id: string) {
   const C = Currencies[id]
   return formatGain(C.amount, Decimal.mul(C.gain, C.passive))
 }

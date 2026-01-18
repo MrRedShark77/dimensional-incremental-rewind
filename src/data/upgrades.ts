@@ -1,5 +1,5 @@
 import type { DecimalSource } from "break_eternity.js"
-import { Currencies, Currency } from "./currencies"
+import { Currencies } from "./currencies"
 import Decimal from "break_eternity.js"
 import { player, temp } from "@/main"
 import { format, formatMult, formatPlus, formatPow } from "@/utils/formats"
@@ -8,8 +8,8 @@ import { isMilestoneAchieved } from "./milestones"
 import { splitIntoGroups } from "@/utils/other"
 import { hasShapeTree } from "./shape_tree"
 
-export type NormalUpgradeCost = [Currency | string, DecimalSource]
-export type RepeatableUpgradeCost = [Currency | string, (x: DecimalSource) => DecimalSource, (x: DecimalSource) => DecimalSource]
+export type NormalUpgradeCost = [string, DecimalSource]
+export type RepeatableUpgradeCost = [string, (x: DecimalSource) => DecimalSource, (x: DecimalSource) => DecimalSource]
 // export type UpgradeEffect = DecimalSource | DecimalSource[] | Record<string, DecimalSource>
 
 export type Upgrade = {
@@ -1177,11 +1177,11 @@ export function purchaseUpgrade(id: string, max: boolean = temp.upgrades_max[id]
 
   let costs = getUpgradeCosts(id, level);
 
-  if (U.cost.every(([x],i) => Decimal.gte(Currencies[x as Currency].amount, costs[i]))) {
+  if (U.cost.every(([x],i) => Decimal.gte(Currencies[x].amount, costs[i]))) {
     let bulk = Decimal.add(level, 1)
     if (max && U.repeatable) {
       let min = DC.DINF
-      for (const x of U.cost as RepeatableUpgradeCost[]) min = min.min(x[2](Currencies[x[0] as Currency].amount));
+      for (const x of U.cost as RepeatableUpgradeCost[]) min = min.min(x[2](Currencies[x[0]].amount));
       if (min.gt(bulk)) {
         bulk = min
         if (!temp.upgrades_el[id]) costs = getUpgradeCosts(id, min.sub(1));
@@ -1190,7 +1190,7 @@ export function purchaseUpgrade(id: string, max: boolean = temp.upgrades_max[id]
     player.upgrades[id] = bulk
     if (!temp.upgrades_el[id]) U.cost.forEach(([x],i) => {
       if (temp.currencies_el[x]) return;
-      const C = Currencies[x as Currency]
+      const C = Currencies[x]
       C.amount = Decimal.sub(C.amount, costs[i]).max(0)
     })
     player.discovered_upgrades[id] = true
@@ -1203,7 +1203,7 @@ export function getUpgradesNotification(group: string): boolean {
     const U = Upgrades[id], level = player.upgrades[id]
     if (!(player.discovered_upgrades[id] || (U.condition?.() ?? true)) || (U.repeatable ? rep_auto : Decimal.gte(level, 1))) continue;
     const costs = getUpgradeCosts(id, level);
-    if (U.cost.every(([x],i) => Decimal.gte(Currencies[x as Currency].amount, costs[i]))) return true;
+    if (U.cost.every(([x],i) => Decimal.gte(Currencies[x].amount, costs[i]))) return true;
   }
 
   return false

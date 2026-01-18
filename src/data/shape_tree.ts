@@ -1,6 +1,6 @@
 import { expPow, scale, simpleCost } from "@/utils/decimal";
 import type { DecimalSource } from "break_eternity.js";
-import { Currencies, Currency } from "./currencies";
+import { Currencies } from "./currencies";
 import Decimal from "break_eternity.js";
 import { player, temp } from "@/main";
 import { splitIntoGroups } from "@/utils/other";
@@ -29,7 +29,7 @@ export const FabricCostRequirements: {
 ]
 
 export function getFabrics(i: number) {
-  const F = FabricCostRequirements[i], C = Currencies[F.currency as Currency]
+  const F = FabricCostRequirements[i], C = Currencies[F.currency]
 
   if (Decimal.gte(C.amount, F.require(player.total_fabrics[i]))) player.total_fabrics[i] = Decimal.add(player.total_fabrics[i], 1).max(F.bulk(C.amount));
 }
@@ -122,7 +122,7 @@ export function purchaseShapeTree(id: string) {
 
   if (player.shape_tree[id] || !(U.condition?.() ?? true)) return;
 
-  if (Decimal.gte(Currencies.fabrics.amount, U.cost) && (U.require?.every(([x,y]) => Decimal.gte(Currencies[x as Currency].amount, y)) ?? true)) {
+  if (Decimal.gte(Currencies.fabrics.amount, U.cost) && (U.require?.every(([x,y]) => Decimal.gte(Currencies[x].amount, y)) ?? true)) {
     player.spent_fabrics = Decimal.add(player.spent_fabrics, U.cost)
     player.shape_tree[id] = true
   }
