@@ -67,7 +67,7 @@ export const Resets: Record<string, {
     get next() { return Dimensions[Dimension.Shape].next(Decimal.add(Currencies[this.gain].amount, temp.currencies[this.gain])) },
 
     onreset() {
-      // checkMilestones('shape')
+      checkMilestones('shape')
     },
     reset() {
       player.dimensions[1] = 0
@@ -75,7 +75,8 @@ export const Resets: Record<string, {
       player.strings = 0
       resetUpgradesByGroup('line-seg');
       resetUpgradesByGroup('string');
-      resetMilestonesByGroup('line');
+      if (!isMilestoneAchieved('shape\\3')) resetMilestonesByGroup('line',['line\\2','line\\3','line\\5']);
+      resetUpgradesByGroup('dots')
 
       Resets.lines.reset();
     },
@@ -86,11 +87,6 @@ export function doReset(id: string, force = false) {
   const R = Resets[id]
 
   if (force || Decimal.gte(temp.currencies[R.gain],1)) {
-    if (id === 'shapes') {
-      alert(`Coming soon!`)
-      return;
-    }
-
     const G = Currencies[R.gain]
 
     if (!force) {

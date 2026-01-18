@@ -12,6 +12,9 @@ import type { Component, StyleValue } from 'vue'
 import { isMilestoneAchieved } from './milestones'
 import { getUpgradesNotification } from './upgrades'
 import { Dimension, Dimensions, DimensionShiftRequire } from './dimensions'
+import ShapeMilestoneTab from '@/components/dimensions/ShapeMilestoneTab.vue'
+import ShapeTreeTab from '@/components/dimensions/ShapeTreeTab.vue'
+import PolygonsTab from '@/components/dimensions/PolygonsTab.vue'
 
 export const TAB_COMPONENTS: Record<string, {
   name: string
@@ -71,6 +74,18 @@ export const TAB_COMPONENTS: Record<string, {
       return !Dimensions[Dimension.Shape].auto && Decimal.gte(temp.currencies['shapes'],1)
     },
   },
+  'shape_milestone': {
+    name: 'Shape Milestones',
+    component: ShapeMilestoneTab,
+  },
+  'shape_tree': {
+    name: 'Shape Tree',
+    component: ShapeTreeTab,
+  },
+  'polygons': {
+    name: 'Polygons',
+    component: PolygonsTab,
+  },
 }
 
 export const TABS: {
@@ -108,7 +123,12 @@ export const TABS: {
     name: 'Shape',
     condition: () => Decimal.gte(player.dimensionShift, 2),
 
-    stabs: [['shape']],
+    prestab: 'shape',
+    stabs: [
+      ['shape_milestone'],
+      ['shape_tree', () => isMilestoneAchieved('shape\\1')],
+      ['polygons', () => isMilestoneAchieved('shape\\2')],
+    ],
   },
 ]
 

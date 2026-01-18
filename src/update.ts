@@ -4,10 +4,11 @@ import { Currencies, Currency } from './data/currencies'
 import { player, temp } from './main'
 import Decimal from 'break_eternity.js'
 import { Dimensions, updateDimensionsTemp } from './data/dimensions'
-import { purchaseUpgrade, RepeatableUpgradeAutomation, RepeatableUpgradeGroups, UpgradeCurrencyEL, UpgradeGroups, UpgradeKeys, UpgradeKeysPriority, Upgrades, UpgradesAll, UpgradesEL, type UpgradeEffect } from './data/upgrades'
+import { purchaseUpgrade, RepeatableUpgradeAutomation, RepeatableUpgradeGroups, UpgradeCurrencyEL, UpgradeGroups, UpgradeKeys, UpgradeKeysPriority, Upgrades, UpgradesAll, UpgradesEL } from './data/upgrades'
 import { isMilestoneAchieved, MilestoneKeys, Milestones } from './data/milestones'
 import { DC } from './utils/decimal'
 import { updateTabNotifications } from './data/tabs'
+import { ShapeTree, ShapeTreeKeys } from './data/shape_tree'
 
 // Calculation
 
@@ -27,7 +28,7 @@ export function loop() {
 }
 
 export function calc(dt: number) {
-  for (const i in Currencies) {
+  for (const i in Currencies) if (i !== 'fabrics') {
     const C = Currencies[i as Currency]
     C.amount = Decimal.mul(temp.currencies[i], C.passive).mul(dt).add(C.amount)
   }
@@ -49,7 +50,8 @@ export type Temp = {
   currencies: Record<string, DecimalSource>
   dimension_effects: DecimalSource[]
 
-  dot_softcap1: [DecimalSource, DecimalSource]
+  dot_softcaps: [DecimalSource, DecimalSource][]
+  line_softcaps: [DecimalSource, DecimalSource][]
 
   line_segments_mult: DecimalSource
   line_segments_exp: DecimalSource[]
@@ -57,9 +59,16 @@ export type Temp = {
   line_segments_cap: DecimalSource
 
   string_effect: DecimalSource
-  string_softcap1: [DecimalSource, DecimalSource]
+  string_softcaps: [DecimalSource, DecimalSource][]
 
-  upgrades: Record<string, UpgradeEffect>
+  shape_tree_effect: Record<string, DecimalSource>
+
+  polygons_mult: DecimalSource
+  polygons_exp: DecimalSource[]
+  polygons_effect: DecimalSource
+  polygons_cap: DecimalSource
+
+  upgrades: Record<string, DecimalSource>
   upgrades_max: Record<string, boolean>
   upgrades_el: Record<string, boolean>
   currencies_el: Record<string, boolean>
@@ -75,7 +84,13 @@ export function getTempData(): Temp {
     currencies: {},
     dimension_effects: [0,1,1],
 
-    dot_softcap1: [1e10, 4],
+    dot_softcaps: [
+      [1e10, 4],
+      ['e1000',16]
+    ],
+    line_softcaps: [
+      [1e9, 4],
+    ],
 
     line_segments_mult: 1,
     line_segments_exp: [0,0,1],
@@ -83,7 +98,17 @@ export function getTempData(): Temp {
     line_segments_cap: 10,
 
     string_effect: 1,
-    string_softcap1: [1e4, 2],
+    string_softcaps: [
+      [1e4, 2],
+      [DC.DE308, 2],
+    ],
+
+    shape_tree_effect: {},
+
+    polygons_mult: 1,
+    polygons_exp: [0,0,1],
+    polygons_effect: 1,
+    polygons_cap: 1,
 
     upgrades: {},
     upgrades_max: {},
@@ -96,6 +121,7 @@ export function getTempData(): Temp {
 
   for (const i in Currencies) T.currencies[i] = 0
   for (const i of UpgradeKeys) T.upgrades[i] = Upgrades[i].defaultEffect ?? 1;
+  for (const i of ShapeTreeKeys) T.shape_tree_effect[i] = ShapeTree[i].defaultEffect ?? 1;
   for (const i in UpgradeGroups) T.total_repeatable_level[i] = 0;
 
   return T
@@ -132,6 +158,12 @@ export function updateTemp() {
     const U = Upgrades[i], level = player.upgrades[i];
 
     temp.upgrades[i] = U.effect?.(level) ?? 1
+  }
+
+  for (const i of ShapeTreeKeys) {
+    const U = ShapeTree[i];
+
+    temp.shape_tree_effect[i] = U.effect?.() ?? 1
   }
 
   updateDimensionsTemp()

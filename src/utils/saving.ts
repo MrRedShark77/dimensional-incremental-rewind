@@ -1,4 +1,5 @@
 import { MilestoneKeys } from '@/data/milestones';
+import { ShapeTreeKeys } from '@/data/shape_tree';
 import { checkTab } from '@/data/tabs';
 import { UpgradeKeys } from '@/data/upgrades'
 import { player } from '@/main';
@@ -13,8 +14,15 @@ export type Save = {
 
   dimensionShift: DecimalSource
   dimensions: DecimalSource[]
+
   line_segments: DecimalSource
   strings: DecimalSource
+
+  total_fabrics: DecimalSource[]
+  spent_fabrics: DecimalSource
+  shape_tree: Record<string, boolean>
+
+  polygons: DecimalSource
 
   upgrades: Record<string, DecimalSource>
   discovered_upgrades: Record<string, boolean>
@@ -35,8 +43,15 @@ export function getSaveData(): Save {
 
     dimensionShift: -1,
     dimensions: [0,0,0],
+
     line_segments: 0,
     strings: 0,
+
+    total_fabrics: [0,0,0],
+    spent_fabrics: 0,
+    shape_tree: {},
+
+    polygons: 0,
 
     upgrades: {},
     discovered_upgrades: {},
@@ -56,6 +71,7 @@ export function getSaveData(): Save {
     s.discovered_upgrades[id] = false;
   }
   for (const id of MilestoneKeys) s.milestones[id] = false;
+  for (const id of ShapeTreeKeys) s.shape_tree[id] = false;
 
   return s
 }

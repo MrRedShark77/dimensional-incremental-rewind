@@ -84,11 +84,16 @@ export function format(
         ) //(slog.gte(1e9)?'':E(10).pow(slog.sub(slog.floor())).toFixed(4)) + "F" + format(slog.floor(), 0)
       }
 
-      return (
-        (ee.lt(6) ? d.div(e.pow10()).toFixed(Math.max(0, 3 - ee.max(2).sub(2).toNumber())) : '') +
-        'e' +
-        format(e, 0, 9)
-      )
+      if (ee.gte(6)) return 'e' + format(e, 0, 9);
+      else {
+        const m = d.div(e.pow10()), f = Math.max(0, 3 - ee.max(2).sub(2).toNumber());
+        const h = 10 - .5 * 10 ** -f;
+        if (m.gte(h)) {
+          const e2 = e.add(1), ee2 = e2.log10().floor()
+          return (ee2.lt(6) ? (1).toFixed(Math.max(0, 3 - ee2.max(2).sub(2).toNumber())) : '') + 'e' + format(e2, 0, 9);
+        }
+        return m.min(h).toFixed(f) + 'e' + format(e, 0, 9);
+      }
     }
     case '1':
     case 'st': {

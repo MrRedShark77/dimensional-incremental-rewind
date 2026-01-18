@@ -1,5 +1,6 @@
 import { player } from "@/main"
 import { format } from "@/utils/formats"
+import { splitIntoGroups } from "@/utils/other"
 import Decimal, { type DecimalSource } from "break_eternity.js"
 
 export const Milestones: Record<string,{
@@ -109,15 +110,40 @@ export const Milestones: Record<string,{
     get description() { return `Automatically update String.` },
     condition() { return Decimal.gte(player.dimensions[1], this.value) },
   },
+
+  'shape\\1': {
+    value: 1,
+
+    get title() { return `<b>${format(this.value,0)}</b> Shapes` },
+    get description() { return `Unlock Shape tree. You always can buy max dots and keep dot upgrades on Line reset.` },
+    condition() { return Decimal.gte(player.dimensions[2], this.value) },
+  },
+  'shape\\2': {
+    value: 2,
+
+    get title() { return `<b>${format(this.value,0)}</b> Shapes` },
+    get description() { return `Unlock Polygons. You always can buy max lines.` },
+    condition() { return Decimal.gte(player.dimensions[2], this.value) },
+  },
+  'shape\\3': {
+    value: 3,
+
+    get title() { return `<b>${format(this.value,0)}</b> Shapes` },
+    get description() { return `You keep line milestones on Shape reset. Multiply Polygons gain by <b>10^Shapes</b>.` },
+    condition() { return Decimal.gte(player.dimensions[2], this.value) },
+  },
+  'shape\\4': {
+    value: 4,
+
+    get title() { return `<b>${format(this.value,0)}</b> Shapes` },
+    get description() { return `Automatically update lines.` },
+    condition() { return Decimal.gte(player.dimensions[2], this.value) },
+  },
 }
 
 export const MilestoneKeys = Object.keys(Milestones)
 
-export const MilestoneGroups: Record<string, string[]> = (() => {
-  const a: Record<string, string[]> = {}
-  MilestoneKeys.map(x => [x.split("\\")[0],x]).forEach(([x,y]) => (a[x] ??= []).push(y))
-  return a
-})()
+export const MilestoneGroups: Record<string, string[]> = splitIntoGroups(MilestoneKeys)
 
 export function resetMilestonesByGroup(group: string, keep: string[] = []) { for (const i of MilestoneGroups[group]) if (!keep.includes(i)) player.milestones[i] = false; }
 export function checkMilestones(group: string) {

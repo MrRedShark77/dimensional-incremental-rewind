@@ -24,10 +24,12 @@ export function load() {
     loop()
   }, 1000 / FPS)
   setInterval(() => {
-    save()
+    // save()
   }, 60000);
 }
 
-export const app = createApp(App)
-
-app.mount('#app')
+try {
+  createApp(App).mount('#app')
+} catch (error) {
+  console.error(error)
+}

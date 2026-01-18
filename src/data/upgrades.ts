@@ -3,12 +3,14 @@ import { Currencies, Currency } from "./currencies"
 import Decimal from "break_eternity.js"
 import { player, temp } from "@/main"
 import { format, formatMult, formatPlus, formatPow } from "@/utils/formats"
-import { DC, expPow, softcap } from "@/utils/decimal"
+import { DC, expPow, softcap, sumBase } from "@/utils/decimal"
 import { isMilestoneAchieved } from "./milestones"
+import { splitIntoGroups } from "@/utils/other"
+import { hasShapeTree } from "./shape_tree"
 
 export type NormalUpgradeCost = [Currency | string, DecimalSource]
 export type RepeatableUpgradeCost = [Currency | string, (x: DecimalSource) => DecimalSource, (x: DecimalSource) => DecimalSource]
-export type UpgradeEffect = DecimalSource | DecimalSource[] | Record<string, DecimalSource>
+// export type UpgradeEffect = DecimalSource | DecimalSource[] | Record<string, DecimalSource>
 
 export type Upgrade = {
   description: string
@@ -18,9 +20,9 @@ export type Upgrade = {
   cost: NormalUpgradeCost[] | RepeatableUpgradeCost[]
   repeatable?: boolean
 
-  effect?: (x: DecimalSource) => UpgradeEffect
-  defaultEffect?: UpgradeEffect
-  effectDisplay?: (x: UpgradeEffect) => string
+  effect?: (x: DecimalSource) => DecimalSource
+  defaultEffect?: DecimalSource
+  effectDisplay?: (x: DecimalSource) => string
 
   [index: string]: unknown
 }
@@ -42,10 +44,10 @@ export const Upgrades: Record<string, Upgrade> = {
     get exp() { return getUpgradeEffect('dots\\7') },
     effect() {
       const x = Decimal.max(player.dimensions[0], 1)
-      return x.pow(hasUpgrade('dots\\4') ? 1 : .5).mul(this.exp as DecimalSource).pow_base(x)
+      return softcap(x.pow(hasUpgrade('dots\\4') ? 1 : .5).mul(this.exp as DecimalSource).pow_base(x), 'ee30000', 0.5, "E", 2)
     },
     defaultEffect: 1,
-    effectDisplay: x => formatMult(x as DecimalSource),
+    effectDisplay: x => formatMult(x),
   },
   'dots\\2': {
     condition: () => hasUpgrade('dots\\1'),
@@ -58,10 +60,10 @@ export const Upgrades: Record<string, Upgrade> = {
 
     effect() {
       const x = Decimal.max(player.dimensions[0], 0)
-      return Decimal.add(player.points, 10).log10().pow(x)
+      return softcap(Decimal.add(player.points, 10).log10().pow(x), 'ee30000', 0.5, "E", 2)
     },
     defaultEffect: 1,
-    effectDisplay: x => formatMult(x as DecimalSource),
+    effectDisplay: x => formatMult(x),
   },
   'dots\\3': {
     condition: () => hasUpgrade('dots\\2'),
@@ -74,10 +76,10 @@ export const Upgrades: Record<string, Upgrade> = {
 
     get base() { return Decimal.add(hasUpgrade('dots\\6') ? .3 : .25, getUpgradeEffect('dots\\9')) },
     effect() {
-      return Decimal.add(player.points, 4).log2().log2().pow(this.base as DecimalSource)
+      return Decimal.add(player.points, 4).log2().log2().pow(this.base as DecimalSource).min(1e100)
     },
     defaultEffect: 1,
-    effectDisplay: x => formatMult(x as DecimalSource, 3),
+    effectDisplay: x => formatMult(x, 3),
   },
   'dots\\4': {
     condition: () => hasUpgrade('dots\\3'),
@@ -99,10 +101,12 @@ export const Upgrades: Record<string, Upgrade> = {
 
     get base() { return hasUpgrade('dots\\13') ? .01736 : .01 },
     effect() {
-      return softcap(Decimal.add(player.dimensions[0], 1).log10().mul(this.base as DecimalSource).add(1), 2.1, .5, 'P')
+      let x = softcap(Decimal.add(player.dimensions[0], 1).log10().mul(this.base as DecimalSource).add(1), 2.1, .5, 'P')
+      x = hasUpgrade('polygon\\4') ? softcap(x, 3.65, 1, "LOG") : x.min(3.65)
+      return x
     },
     defaultEffect: 1,
-    effectDisplay: x => formatPow(x as DecimalSource, 3),
+    effectDisplay: x => formatPow(x, 3),
   },
   'dots\\6': {
     condition: () => hasUpgrade('dots\\5'),
@@ -128,7 +132,7 @@ export const Upgrades: Record<string, Upgrade> = {
       return x
     },
     defaultEffect: 1,
-    effectDisplay: x => formatPow(x as DecimalSource, 3),
+    effectDisplay: x => formatPow(x, 3),
   },
   'dots\\8': {
     condition: () => hasUpgrade('dots\\7'),
@@ -141,10 +145,10 @@ export const Upgrades: Record<string, Upgrade> = {
 
     get base() { return Decimal.add(hasUpgrade('dots\\16') ? .4 : .25, getUpgradeEffect('dots\\24')) },
     effect() {
-      return Decimal.add(player.dimensions[0], 1).pow(this.base as DecimalSource)
+      return softcap(Decimal.add(player.dimensions[0], 1).pow(this.base as DecimalSource), DC.DE308, 0.5, 'E')
     },
     defaultEffect: 1,
-    effectDisplay: x => formatPow(x as DecimalSource),
+    effectDisplay: x => formatPow(x),
   },
   'dots\\9': {
     condition: () => hasUpgrade('dots\\8'),
@@ -161,7 +165,7 @@ export const Upgrades: Record<string, Upgrade> = {
       return Decimal.add(player.points, 10).log10().log10().div(this.base as DecimalSource)
     },
     defaultEffect: 0,
-    effectDisplay: x => formatPlus(x as DecimalSource, 3),
+    effectDisplay: x => formatPlus(x, 3),
   },
   'dots\\10': {
     condition: () => hasUpgrade('dots\\9'),
@@ -176,7 +180,7 @@ export const Upgrades: Record<string, Upgrade> = {
       return Decimal.add(player.points, 10).slog(10).pow(1.666).pow(getUpgradeEffect('dots\\18'))
     },
     defaultEffect: 1,
-    effectDisplay: x => formatPow(x as DecimalSource),
+    effectDisplay: x => formatPow(x),
   },
   'dots\\11': {
     condition: () => hasUpgrade('dots\\10'),
@@ -224,7 +228,7 @@ export const Upgrades: Record<string, Upgrade> = {
       return Decimal.max(player.dimensions[1], 1).pow(this.base as DecimalSource)
     },
     defaultEffect: 1,
-    effectDisplay: x => formatMult(x as DecimalSource),
+    effectDisplay: x => formatMult(x),
   },
   'dots\\15': {
     condition: () => hasUpgrade('dots\\14'),
@@ -239,7 +243,7 @@ export const Upgrades: Record<string, Upgrade> = {
       return Decimal.add(player.dimensions[0], 10).log10().log10().div(5).add(1)
     },
     defaultEffect: 1,
-    effectDisplay: x => formatPow(x as DecimalSource, 4),
+    effectDisplay: x => formatPow(x, 4),
   },
   'dots\\16': {
     condition: () => hasUpgrade('dots\\15'),
@@ -263,7 +267,7 @@ export const Upgrades: Record<string, Upgrade> = {
       return Decimal.max(player.points, 10).log10().log10().mul(.075).add(1)
     },
     defaultEffect: 1,
-    effectDisplay: x => formatPow(x as DecimalSource, 3),
+    effectDisplay: x => formatPow(x, 3),
   },
   'dots\\18': {
     condition: () => hasUpgrade('dots\\17'),
@@ -279,7 +283,7 @@ export const Upgrades: Record<string, Upgrade> = {
       return Decimal.max(player.dimensions[1], 1).pow(.9)
     },
     defaultEffect: 1,
-    effectDisplay: x => formatPow(x as DecimalSource, 3),
+    effectDisplay: x => formatPow(x, 3),
   },
   'dots\\19': {
     condition: () => hasUpgrade('dots\\18'),
@@ -304,7 +308,7 @@ export const Upgrades: Record<string, Upgrade> = {
       return Decimal.add(player.dimensions[0], 1).log10().div(20)
     },
     defaultEffect: 0,
-    effectDisplay: x => formatPlus(x as DecimalSource, 3),
+    effectDisplay: x => formatPlus(x, 3),
   },
   'dots\\21': {
     condition: () => hasUpgrade('dots\\20'),
@@ -319,7 +323,7 @@ export const Upgrades: Record<string, Upgrade> = {
       return Decimal.add(player.strings, 10).log10().pow(3)
     },
     defaultEffect: 1,
-    effectDisplay: x => formatMult(x as DecimalSource, 3),
+    effectDisplay: x => formatMult(x, 3),
   },
   'dots\\22': {
     condition: () => hasUpgrade('dots\\21'),
@@ -343,7 +347,7 @@ export const Upgrades: Record<string, Upgrade> = {
       return Decimal.add(player.points, 1).log10().add(1).log10().add(1).log10().add(1).pow(1.25)
     },
     defaultEffect: 1,
-    effectDisplay: x => formatMult(x as DecimalSource, 3),
+    effectDisplay: x => formatMult(x, 3),
   },
   'dots\\24': {
     condition: () => hasUpgrade('dots\\23'),
@@ -359,7 +363,7 @@ export const Upgrades: Record<string, Upgrade> = {
       return Decimal.add(player.strings, 1).log10().div(20)
     },
     defaultEffect: 0,
-    effectDisplay: x => formatPlus(x as DecimalSource, 3),
+    effectDisplay: x => formatPlus(x, 3),
   },
   'dots\\25': {
     condition: () => hasUpgrade('dots\\24'),
@@ -383,7 +387,7 @@ export const Upgrades: Record<string, Upgrade> = {
       return Decimal.max(player.points, 'e10').log10().log10().log10().div(6).add(1)
     },
     defaultEffect: 1,
-    effectDisplay: x => formatMult(x as DecimalSource, 3),
+    effectDisplay: x => formatMult(x, 3),
   },
   'dots\\27': {
     condition: () => hasUpgrade('dots\\26'),
@@ -392,6 +396,45 @@ export const Upgrades: Record<string, Upgrade> = {
     cost: [
       ['points', 'e3.841e311'],
       ['dots', 6.52751e88],
+    ],
+  },
+  'dots\\28': {
+    condition: () => isMilestoneAchieved('shape\\1') && hasUpgrade('dots\\27'),
+    get description() { return `Multiply Lines gain by <b>1+0.284*Shapes</b>.` },
+
+    cost: [
+      ['points', 'e6.246e2819'],
+      ['dots', '4.1135e627'],
+    ],
+    effect() {
+      return Decimal.mul(player.dimensions[2], .284).add(1)
+    },
+    defaultEffect: 1,
+    effectDisplay: x => formatMult(x,3),
+  },
+  'dots\\29': {
+    condition: () => isMilestoneAchieved('shape\\2') && hasUpgrade('dots\\28'),
+    get description() { return `Multiply Polygons gain and cap by <b>${hasUpgrade('dots\\30') ? '2^' : ''}slog10(points)</b>.` },
+
+    cost: [
+      ['points', 'e2.651e18724'],
+      ['dots', '3.27e1143'],
+    ],
+    effect() {
+      let x = Decimal.add(player.points, 10).slog(10)
+      if (hasUpgrade('dots\\30')) x = x.pow_base(2);
+      return x
+    },
+    defaultEffect: 1,
+    effectDisplay: x => formatMult(x,3),
+  },
+  'dots\\30': {
+    condition: () => hasUpgrade('dots\\29'),
+    get description() { return `Improve the previous dot upgrade.` },
+
+    cost: [
+      ['points', 'e1.451e90476'],
+      ['dots', '3.6351e1805'],
     ],
   },
 
@@ -403,11 +446,17 @@ export const Upgrades: Record<string, Upgrade> = {
       ['line-segments', x => Decimal.pow(x,1.5).pow_base(3).mul(100), x => Decimal.div(x, 100).log(3).root(1.5).add(1).floor()],
     ],
 
+    get soft_exp() {
+      let x = .5
+      if (hasUpgrade('string\\3')) x += .05;
+      if (hasShapeTree('2-1')) x += .05;
+      return x
+    },
     effect(x) {
-      return softcap(x, 25, hasUpgrade('string\\3') ? .55 : .5, 'P')
+      return softcap(x, 25, this.soft_exp as DecimalSource, 'P')
     },
     defaultEffect: 0,
-    effectDisplay: x => formatPlus(x as DecimalSource),
+    effectDisplay: x => formatPlus(x),
   },
   'line-seg\\2': {
     condition: () => hasUpgrade('line-seg\\1'),
@@ -418,12 +467,18 @@ export const Upgrades: Record<string, Upgrade> = {
       ['line-segments', x => Decimal.pow(x,1.5).pow_base(4.37).mul(200), x => Decimal.div(x, 200).log(4.37).root(1.5).add(1).floor()],
     ],
 
+    get soft_exp() {
+      let x = .5
+      if (hasUpgrade('string\\3')) x += .05;
+      if (hasShapeTree('2-1')) x += .05;
+      return x
+    },
     get base() { return Decimal.add(.5, getUpgradeEffect('line-seg\\12')) },
     effect(x) {
-      return softcap(Decimal.mul(x,this.base as DecimalSource), 10, hasUpgrade('string\\3') ? .55 : .5, 'P')
+      return softcap(Decimal.mul(x,this.base as DecimalSource), 10, this.soft_exp as DecimalSource, 'P')
     },
     defaultEffect: 0,
-    effectDisplay: x => formatPlus(x as DecimalSource),
+    effectDisplay: x => formatPlus(x),
   },
   'line-seg\\3': {
     condition: () => hasUpgrade('line-seg\\2'),
@@ -438,7 +493,7 @@ export const Upgrades: Record<string, Upgrade> = {
       return expPow(Decimal.max(player.points, 'ee6'), 0.5).log10().pow(1000/3).div('ee3').pow(7.2)
     },
     defaultEffect: 1,
-    effectDisplay: x => formatMult(x as DecimalSource),
+    effectDisplay: x => formatMult(x),
   },
   'line-seg\\4': {
     condition: () => hasUpgrade('line-seg\\3'),
@@ -454,7 +509,7 @@ export const Upgrades: Record<string, Upgrade> = {
       return Decimal.add(10, player.line_segments).log10().pow(this.base as DecimalSource)
     },
     defaultEffect: 1,
-    effectDisplay: x => formatMult(x as DecimalSource),
+    effectDisplay: x => formatMult(x),
   },
   'line-seg\\5': {
     condition: () => hasUpgrade('line-seg\\4'),
@@ -465,12 +520,12 @@ export const Upgrades: Record<string, Upgrade> = {
       ['line-segments', 4.162e8],
     ],
 
-    get base() { return Decimal.add(1, getUpgradeEffect('line-seg\\14')) },
+    get base() { return Decimal.add(1, getUpgradeEffect(hasUpgrade('line-seg\\19') ? 'line-seg\\13' : 'line-seg\\14')) },
     effect() {
       return Decimal.max(1e10, player.points).log10().log10().pow(this.base as DecimalSource)
     },
     defaultEffect: 1,
-    effectDisplay: x => formatMult(x as DecimalSource),
+    effectDisplay: x => formatMult(x),
   },
   'line-seg\\6': {
     condition: () => hasUpgrade('line-seg\\5'),
@@ -492,10 +547,12 @@ export const Upgrades: Record<string, Upgrade> = {
 
     get base() { return Decimal.add(1.3, getUpgradeEffect('dots\\20')) },
     effect(x) {
-      return softcap(Decimal.root(x, hasUpgrade('dots\\19') ? 1 : 2).pow_base(this.base as DecimalSource), 1e10, 0.5, 'E')
+      let y = Decimal.root(x, hasUpgrade('dots\\19') ? 1 : 2).pow_base(this.base as DecimalSource)
+      if (!hasShapeTree('2-2')) y = softcap(y, 1e10, 0.5, 'E');
+      return y
     },
     defaultEffect: 1,
-    effectDisplay: x => formatMult(x as DecimalSource, 3),
+    effectDisplay: x => formatMult(x, 3),
   },
   'line-seg\\8': {
     condition: () => hasUpgrade('line-seg\\7'),
@@ -519,7 +576,7 @@ export const Upgrades: Record<string, Upgrade> = {
       return hasUpgrade('line-seg\\15') ? Decimal.pow(1.02225, temp.total_repeatable_level['line-seg']) : Decimal.mul(temp.total_repeatable_level['line-seg'], .0108).add(1)
     },
     defaultEffect: 1,
-    effectDisplay: x => formatMult(x as DecimalSource, 3),
+    effectDisplay: x => formatMult(x, 3),
   },
   'line-seg\\10': {
     condition: () => hasUpgrade('line-seg\\9'),
@@ -544,7 +601,7 @@ export const Upgrades: Record<string, Upgrade> = {
       return Decimal.pow(this.base as DecimalSource, x)
     },
     defaultEffect: 1,
-    effectDisplay: x => formatPow(x as DecimalSource),
+    effectDisplay: x => formatPow(x),
   },
   'line-seg\\12': {
     condition: () => hasUpgrade('line-seg\\11'),
@@ -560,7 +617,7 @@ export const Upgrades: Record<string, Upgrade> = {
       return Decimal.add(player.points, 1).slog(10).div(hasUpgrade('line-seg\\16') ? 25 : 50)
     },
     defaultEffect: 0,
-    effectDisplay: x => formatPlus(x as DecimalSource, 3),
+    effectDisplay: x => formatPlus(x, 3),
   },
   'line-seg\\13': {
     condition: () => hasUpgrade('line-seg\\12'),
@@ -569,7 +626,17 @@ export const Upgrades: Record<string, Upgrade> = {
     priority: 2,
 
     cost: [
-      ['line-segments', x => Decimal.pow(isMilestoneAchieved('line\\11') ? 1.15 : 1.2,x).mul(54).pow10(), x => Decimal.log10(x).div(54).log(isMilestoneAchieved('line\\11') ? 1.15 : 1.2).add(1).floor()],
+      ['line-segments', x => {
+        let s = 1.2
+        if (isMilestoneAchieved('line\\11')) s -= .05;
+        if (hasUpgrade('line-seg\\22')) s -= .05;
+        return Decimal.pow(s,x).mul(54).pow10()
+      }, x => {
+        let s = 1.2
+        if (isMilestoneAchieved('line\\11')) s -= .05;
+        if (hasUpgrade('line-seg\\22')) s -= .05;
+        return Decimal.log10(x).div(54).log(s).add(1).floor()
+      }],
     ],
 
     get base() { return Decimal.add(0.5, getUpgradeEffect('string\\9')) },
@@ -577,7 +644,7 @@ export const Upgrades: Record<string, Upgrade> = {
       return Decimal.mul(x, this.base as DecimalSource)
     },
     defaultEffect: 0,
-    effectDisplay: x => formatPlus(x as DecimalSource),
+    effectDisplay: x => formatPlus(x),
   },
   'line-seg\\14': {
     condition: () => hasUpgrade('line-seg\\13'),
@@ -593,12 +660,11 @@ export const Upgrades: Record<string, Upgrade> = {
       return Decimal.add(getUpgradeEffect('line-seg\\13'),1).root(2).sub(1)
     },
     defaultEffect: 0,
-    effectDisplay: x => formatPlus(x as DecimalSource,3),
+    effectDisplay: x => formatPlus(x,3),
   },
   'line-seg\\15': {
     condition: () => hasUpgrade('line-seg\\14'),
     get description() { return `Improve the ninth line upgrade.` },
-    priority: 1,
 
     cost: [
       ['dots', 4.496e19],
@@ -608,7 +674,6 @@ export const Upgrades: Record<string, Upgrade> = {
   'line-seg\\16': {
     condition: () => hasUpgrade('line-seg\\15'),
     get description() { return `Improve the 12th line upgrade.` },
-    priority: 1,
 
     cost: [
       ['dots', 5.872e20],
@@ -630,12 +695,11 @@ export const Upgrades: Record<string, Upgrade> = {
       return Decimal.add(player.line_segments, 10).log10().pow(this.base as DecimalSource)
     },
     defaultEffect: 1,
-    effectDisplay: x => formatMult(x as DecimalSource),
+    effectDisplay: x => formatMult(x),
   },
   'line-seg\\18': {
     condition: () => hasUpgrade('line-seg\\17'),
     get description() { return `Raise Line Segments gain by <b>1+lg(Lines)/10</b>.` },
-    priority: 1,
 
     cost: [
       ['dots', 5.393e25],
@@ -646,7 +710,79 @@ export const Upgrades: Record<string, Upgrade> = {
       return Decimal.add(player.dimensions[1], 1).log10().div(10).add(1)
     },
     defaultEffect: 1,
-    effectDisplay: x => formatPow(x as DecimalSource, 3),
+    effectDisplay: x => formatPow(x, 3),
+  },
+  'line-seg\\19': {
+    condition: () => isMilestoneAchieved('shape\\2') && hasUpgrade('line-seg\\18'),
+    get description() { return `The fifth line upgrade is affected by the 13th line upgrade instead of 14th.` },
+
+    cost: [
+      ['dots', '2.77e1016'],
+      ['line-segments', '9.6e47831'],
+    ],
+  },
+  'line-seg\\20': {
+    condition: () => hasUpgrade('line-seg\\19'),
+    get description() { return `Raise points gain by <b>1+lg(lg(Line Segments))/${hasUpgrade('line-seg\\21') ? 7.06 : 10}</b> to the exponent.` },
+
+    cost: [
+      ['dots', '3.906e1078'],
+      ['line-segments', '2.51e138614'],
+    ],
+
+    effect() {
+      return Decimal.add(player.line_segments, 10).log10().log10().div(hasUpgrade('line-seg\\21') ? 7.06 : 10).add(1)
+    },
+    defaultEffect: 1,
+    effectDisplay: x => formatPow(x, 3),
+  },
+  'line-seg\\21': {
+    condition: () => hasUpgrade('line-seg\\20'),
+    get description() { return `Improve the previous line upgrade.` },
+
+    cost: [
+      ['dots', '5.3e32115'],
+      ['line-segments', '5e409724'],
+    ],
+  },
+  'line-seg\\22': {
+    condition: () => hasUpgrade('line-seg\\21'),
+    get description() { return `The 13th line upgrade's cost scaling is reduced.` },
+
+    cost: [
+      ['dots', 'e6331910'],
+      ['line-segments', 'e1288669'],
+    ],
+  },
+  'line-seg\\23': {
+    condition: () => hasUpgrade('line-seg\\22'),
+    get description() { return `Raise Line Segments gain and effect by <b>lg(lg(Polygons))</b>.` },
+
+    cost: [
+      ['dots', 'e5.4205e9'],
+      ['line-segments', 'e5311229'],
+    ],
+
+    effect() {
+      return Decimal.add(player.polygons, 10).log10().log10().add(1)
+    },
+    defaultEffect: 1,
+    effectDisplay: x => formatPow(x,3),
+  },
+  'line-seg\\24': {
+    condition: () => hasUpgrade('line-seg\\23'),
+    get description() { return `Multiply Lines gain softcap start by <b>lg(lg(lg(Line Segments)))^1.94294554745</b>.<br><i>Are you serious?</i>` },
+
+    cost: [
+      ['dots', 'e4.023e11'],
+      ['line-segments', 'e85881185'],
+    ],
+
+    effect() {
+      return Decimal.add(player.line_segments, 1).log10().add(1).log10().add(1).log10().add(1).pow(1.94294554745)
+    },
+    defaultEffect: 1,
+    effectDisplay: x => formatMult(x, 3),
   },
 
   'string\\1': {
@@ -655,7 +791,7 @@ export const Upgrades: Record<string, Upgrade> = {
 
     cost: [
       ['line-segments', 2.0715e168],
-      ['strings', 11680],
+      ['strings', 11600],
     ],
 
     effect() {
@@ -664,7 +800,7 @@ export const Upgrades: Record<string, Upgrade> = {
       return x
     },
     defaultEffect: 1,
-    effectDisplay: x => formatMult(x as DecimalSource,3),
+    effectDisplay: x => formatMult(x,3),
   },
   'string\\2': {
     condition: () => hasUpgrade('string\\1'),
@@ -672,14 +808,14 @@ export const Upgrades: Record<string, Upgrade> = {
 
     cost: [
       ['line-segments', 1.593e178],
-      ['strings', 15126],
+      ['strings', 15100],
     ],
 
     effect() {
       return Decimal.max(player.dimensions[1],2).log2()
     },
     defaultEffect: 1,
-    effectDisplay: x => formatMult(x as DecimalSource,3),
+    effectDisplay: x => formatMult(x,3),
   },
   'string\\3': {
     condition: () => hasUpgrade('string\\2'),
@@ -687,7 +823,7 @@ export const Upgrades: Record<string, Upgrade> = {
 
     cost: [
       ['line-segments', 2.8426e190],
-      ['strings', 37795],
+      ['strings', 37750],
     ],
   },
   'string\\4': {
@@ -706,14 +842,14 @@ export const Upgrades: Record<string, Upgrade> = {
 
     cost: [
       ['line-segments', 3.792e253],
-      ['strings', 182317],
+      ['strings', 182300],
     ],
 
     effect() {
       return Decimal.add(player.strings,1).log10().div(10)
     },
     defaultEffect: 0,
-    effectDisplay: x => formatPlus(x as DecimalSource,3),
+    effectDisplay: x => formatPlus(x,3),
   },
   'string\\6': {
     condition: () => hasUpgrade('string\\5'),
@@ -721,7 +857,7 @@ export const Upgrades: Record<string, Upgrade> = {
 
     cost: [
       ['line-segments', 2.2786e304],
-      ['strings', 603632],
+      ['strings', 603600],
     ],
   },
   'string\\7': {
@@ -730,14 +866,14 @@ export const Upgrades: Record<string, Upgrade> = {
 
     cost: [
       ['line-segments', '1.543e571'],
-      ['strings', 1.6956e8],
+      ['strings', 1.695e8],
     ],
 
     effect() {
       return expPow(Decimal.add(player.strings,1),.5)
     },
     defaultEffect: 1,
-    effectDisplay: x => formatMult(x as DecimalSource,3),
+    effectDisplay: x => formatMult(x,3),
   },
   'string\\8': {
     condition: () => hasUpgrade('string\\7'),
@@ -753,7 +889,7 @@ export const Upgrades: Record<string, Upgrade> = {
       return x.pow(x.pow(.5))
     },
     defaultEffect: 1,
-    effectDisplay: x => formatMult(x as DecimalSource,3),
+    effectDisplay: x => formatMult(x,3),
   },
   'string\\9': {
     condition: () => hasUpgrade('string\\8'),
@@ -769,7 +905,7 @@ export const Upgrades: Record<string, Upgrade> = {
       return Decimal.add(player.strings,1).log10().div(100)
     },
     defaultEffect: 0,
-    effectDisplay: x => formatPlus(x as DecimalSource,3),
+    effectDisplay: x => formatPlus(x,3),
   },
   'string\\10': {
     condition: () => hasUpgrade('string\\9'),
@@ -784,7 +920,7 @@ export const Upgrades: Record<string, Upgrade> = {
       return Decimal.max(player.dimensions[1],1)
     },
     defaultEffect: 1,
-    effectDisplay: x => formatMult(x as DecimalSource),
+    effectDisplay: x => formatMult(x),
   },
   'string\\11': {
     condition: () => hasUpgrade('string\\10'),
@@ -799,7 +935,7 @@ export const Upgrades: Record<string, Upgrade> = {
       return Decimal.add(10, player.dimensions[0]).log10().pow(Decimal.pow(player.dimensions[1],.5))
     },
     defaultEffect: 1,
-    effectDisplay: x => formatMult(x as DecimalSource,3),
+    effectDisplay: x => formatMult(x,3),
   },
   'string\\12': {
     condition: () => hasUpgrade('string\\11'),
@@ -809,6 +945,188 @@ export const Upgrades: Record<string, Upgrade> = {
       ['line-segments', '3.8751e1749'],
       ['strings', 4.019e17],
     ],
+  },
+
+  'polygon\\1': {
+    repeatable: true,
+    get description() { return `Multiply Polygons gain by <b>${format(this.base as DecimalSource)}</b> per level.` },
+
+    cost: [
+      ['polygons', x => sumBase(x,1.01).pow_base(3).mul(10), x => sumBase(Decimal.div(x, 10).log(3),1.01,true).add(1).floor()],
+    ],
+
+    get base() { return Decimal.add(2, getUpgradeEffect('polygon\\9')).add(getUpgradeEffect('polygon\\12')) },
+    effect(x) {
+      return Decimal.pow(this.base as DecimalSource, x)
+    },
+    defaultEffect: 1,
+    effectDisplay: x => formatMult(x),
+  },
+  'polygon\\2': {
+    condition: () => hasUpgrade('polygon\\1'),
+    repeatable: true,
+    get description() { return `Add <b>1</b> to Shapes to Polygons cap exponent per level.` },
+
+    cost: [
+      ['polygons', x => Decimal.pow(x,1.5).pow_base(4).mul(100), x => Decimal.div(x, 100).log(4).root(1.5).add(1).floor()],
+    ],
+
+    get soft_exp() {
+      let x = .5
+      x = x
+      return x
+    },
+    effect(x) {
+      return softcap(x, 25, this.soft_exp as DecimalSource, 'P')
+    },
+    defaultEffect: 0,
+    effectDisplay: x => formatPlus(x),
+  },
+  'polygon\\3': {
+    condition: () => hasUpgrade('polygon\\2'),
+    repeatable: true,
+    get description() { return `Add <b>${format(this.base as DecimalSource)}</b> to OoM of Line Segments to Polygons cap exponent per level.` },
+
+    cost: [
+      ['polygons', x => Decimal.pow(x,1.5).pow_base(5).mul(200), x => Decimal.div(x, 200).log(5).root(1.5).add(1).floor()],
+    ],
+
+    get soft_exp() {
+      let x = .5
+      x = x
+      return x
+    },
+    get base() { return .25 },
+    effect(x) {
+      return softcap(Decimal.mul(x,this.base as DecimalSource), 10, this.soft_exp as DecimalSource, 'P')
+    },
+    defaultEffect: 0,
+    effectDisplay: x => formatPlus(x),
+  },
+  'polygon\\4': {
+    condition: () => hasUpgrade('polygon\\3'),
+    get description() { return `The fifth dot upgrade is softcapped again instead of capped.` },
+
+    cost: [
+      ['polygons', '327407.51'],
+      ['lines', '4849'],
+    ],
+  },
+  'polygon\\5': {
+    condition: () => hasUpgrade('polygon\\4'),
+    get description() { return `Multiply Polygons gain and cap by <b>lg(Polygons)</b>.` },
+
+    cost: [
+      ['polygons', '1.486e7'],
+      ['lines', '6389'],
+    ],
+
+    effect() {
+      return Decimal.add(player.polygons, 10).log10()
+    },
+    defaultEffect: 1,
+    effectDisplay: x => formatMult(x),
+  },
+  'polygon\\6': {
+    condition: () => hasUpgrade('polygon\\5'),
+    get description() { return `Raise Line effect exponent by <b>1+lg(Lines)/2</b>.` },
+
+    cost: [
+      ['polygons', '1.340e9'],
+      ['lines', '11886'],
+    ],
+
+    effect() {
+      return Decimal.add(player.dimensions[1], 1).log10().div(2).add(1)
+    },
+    defaultEffect: 1,
+    effectDisplay: x => formatPow(x,3),
+  },
+  'polygon\\7': {
+    condition: () => hasUpgrade('polygon\\6'),
+    repeatable: true,
+    get description() { return `Multiply Lines gain by <b>${format(this.base as DecimalSource)}</b> per square-rooted level.` },
+
+    cost: [
+      ['polygons', x => Decimal.pow(x,2).pow_base(2).mul(1e12), x => Decimal.div(x, 1e12).log(2).root(2).add(1).floor()],
+    ],
+
+    get base() { return 1.25 },
+    effect(x) {
+      let y = Decimal.root(x, 2).pow_base(this.base as DecimalSource)
+      y = softcap(y, 1e10, 0.5, 'E');
+      return y
+    },
+    defaultEffect: 1,
+    effectDisplay: x => formatMult(x, 3),
+  },
+  'polygon\\8': {
+    condition: () => hasUpgrade('polygon\\7'),
+    get description() { return `Multiply OoM of Line Segments to Polygons cap exponent by <b>1.5</b>, raise Polygon effect by <b>1.1</b>.` },
+
+    cost: [
+      ['polygons', '7.723e13'],
+      ['lines', '1.237e6'],
+    ],
+  },
+  'polygon\\9': {
+    condition: () => hasUpgrade('polygon\\8'),
+    get description() { return `Increase the base of the first polygon upgrade by <b>Shapes/8</b>.` },
+    priority: 1,
+
+    cost: [
+      ['polygons', '6e16'],
+    ],
+    effect() {
+      return Decimal.div(player.dimensions[2],8)
+    },
+    defaultEffect: 1,
+    effectDisplay: x => formatPlus(x, 3),
+  },
+  'polygon\\10': {
+    condition: () => hasUpgrade('polygon\\9'),
+    get description() { return `Multiply Lines gain by <b>1+lg(Polygons)/128</b>.` },
+
+    cost: [
+      ['polygons', '6.347e17'],
+      ['lines', '1.061e7'],
+    ],
+
+    effect() {
+      return Decimal.add(player.polygons,1).log10().div(128).add(1)
+    },
+    defaultEffect: 1,
+    effectDisplay: x => formatMult(x,3),
+  },
+  'polygon\\11': {
+    condition: () => hasUpgrade('polygon\\10'),
+    repeatable: true,
+    get description() { return `Raise points gain by <b>${format(this.base as DecimalSource)}</b> to the exponent per level.` },
+
+    cost: [
+      ['polygons', x => Decimal.pow(x,2.3).pow_base(1.15).mul(3.929e22), x => Decimal.div(x, 3.929e22).log(1.15).root(2.3).add(1).floor()],
+    ],
+
+    get base() { return Decimal.add(1.4, 0) },
+    effect(x) {
+      return Decimal.pow(this.base as DecimalSource, x)
+    },
+    defaultEffect: 1,
+    effectDisplay: x => formatPow(x),
+  },
+  'polygon\\12': {
+    condition: () => hasUpgrade('polygon\\11'),
+    get description() { return `Increase the base of the first polygon upgrade by <b>+0.15*slog10(points)</b>.` },
+    priority: 1,
+
+    cost: [
+      ['polygons', '1e27'],
+    ],
+    effect() {
+      return Decimal.add(player.points, 1).slog(10).mul(.15)
+    },
+    defaultEffect: 0,
+    effectDisplay: x => formatPlus(x, 3),
   },
 }
 
@@ -824,11 +1142,7 @@ export const [NonRepeatableUpgradeKeys, RepeatableUpgradeKeys] = (() => {
 })()
 export const UpgradeKeysPriority = Object.keys(Upgrades).sort((x,y) => Upgrades[y].priority! - Upgrades[x].priority!)
 
-export const UpgradeGroups: Record<string, string[]> = (() => {
-  const a: Record<string, string[]> = {}
-  UpgradeKeys.map(x => [x.split("\\")[0],x]).forEach(([x,y]) => (a[x] ??= []).push(y))
-  return a
-})()
+export const UpgradeGroups: Record<string, string[]> = splitIntoGroups(UpgradeKeys)
 export const [NonRepeatableUpgradeGroups, RepeatableUpgradeGroups] = (() => {
   const a: Record<string, string[]> = {}, b: Record<string, string[]> = {}
   UpgradeKeys.map(x => [x.split("\\")[0],x]).forEach(([x,y]) => (Upgrades[y].repeatable ? (b[x] ??= []).push(y) : (a[x] ??= []).push(y)))
@@ -849,7 +1163,7 @@ export const RepeatableUpgradeAutomation: Record<string, () => boolean> = {
 }
 
 export function hasUpgrade(id: string, level: DecimalSource = 1) : boolean { return Decimal.gte(player.upgrades[id], level) }
-export function getUpgradeEffect<T extends UpgradeEffect>(id: string) { return (Decimal.gte(player.upgrades[id], 1) ? temp.upgrades[id] : Upgrades[id].defaultEffect ?? 1) as T }
+export function getUpgradeEffect(id: string) { return Decimal.gte(player.upgrades[id], 1) ? temp.upgrades[id] : Upgrades[id].defaultEffect ?? 1 }
 export function getUpgradeCosts(id: string, level: DecimalSource = player.upgrades[id]) {
   const U = Upgrades[id]
   return U.repeatable ? (U.cost as RepeatableUpgradeCost[]).map(x=>x[1](level)) : (U.cost as NormalUpgradeCost[]).map(x=>x[1])

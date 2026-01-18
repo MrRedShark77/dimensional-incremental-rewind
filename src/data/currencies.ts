@@ -5,6 +5,8 @@ import Decimal from 'break_eternity.js'
 import { Dimension, Dimensions, Strings } from './dimensions'
 import { isMilestoneAchieved } from './milestones'
 import { getUpgradeEffect } from './upgrades'
+import { DC, expPow } from '@/utils/decimal'
+import { hasShapeTree } from './shape_tree'
 
 export enum Currency {
   Points = 'points',
@@ -14,6 +16,8 @@ export enum Currency {
 
   LineSegments = 'line-segments',
   Strings = 'strings',
+  Fabrics = 'fabrics',
+  Polygons = 'polygons',
 }
 
 export const Currencies: Record<
@@ -38,8 +42,11 @@ export const Currencies: Record<
     },
 
     get gain() {
-      let x = Decimal.mul(temp.dimension_effects[0], temp.dimension_effects[1])
+      let x = Decimal.mul(temp.dimension_effects[0], temp.dimension_effects[1]).pow(temp.dimension_effects[2])
       x = x.pow(temp.line_segments_effect).pow(getUpgradeEffect('dots\\17')).pow(getUpgradeEffect('line-seg\\11'))
+      x = expPow(x, temp.polygons_effect)
+      x = expPow(x, getUpgradeEffect('line-seg\\20'))
+      x = expPow(x, getUpgradeEffect('polygon\\11'))
       return x
     },
 
@@ -128,6 +135,43 @@ export const Currencies: Record<
     },
 
     passive: 0,
+  },
+  fabrics: {
+    name: 'fabrics',
+
+    get amount() {
+      return Decimal.sub(player.total_fabrics.reduce((a,b) => Decimal.add(a,b), DC.D0), player.spent_fabrics).max(0)
+    },
+
+    get gain() {
+      return 0
+    },
+
+    passive: 0,
+  },
+  'polygons': {
+    name: 'Polygons',
+
+    get amount() {
+      return player.polygons
+    },
+    set amount(v) {
+      player.polygons = Decimal.min(temp.polygons_cap, v)
+    },
+
+    get gain() {
+      if (!isMilestoneAchieved('line\\2')) return 0;
+
+      let x = DC.D1
+
+      x = x.mul(getUpgradeEffect('dots\\29')).mul(getUpgradeEffect('polygon\\1')).mul(getUpgradeEffect('polygon\\5'))
+      if (hasShapeTree('4-1')) x = x.mul(10);
+      if (isMilestoneAchieved('shape\\3')) x = Decimal.pow10(player.dimensions[2]).mul(x);
+
+      return x
+    },
+
+    passive: 1,
   },
 }
 
