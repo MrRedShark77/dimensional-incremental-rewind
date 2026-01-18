@@ -24,7 +24,7 @@ export function load() {
     loop()
   }, 1000 / FPS)
   setInterval(() => {
-    // save()
+    save()
   }, 60000);
 }
 
